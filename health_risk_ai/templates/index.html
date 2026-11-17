@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VitalScope – Personalized Health Risk Assessment</title>
+<style>
+:root{
+  --paper:#EDF1F0; --panel:#FFFFFF; --ink:#0F2E36; --muted:#5B7077; --line:#CBD6D6;
+  --low:#2E8B6A; --mod:#C98F0A; --high:#D2402F; --accent:#0F5C6B;
+  --serif:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--sans)}
+header{padding:2.2rem clamp(1rem,4vw,3rem) 1.2rem;max-width:1280px;margin:auto}
+h1{font:600 clamp(1.9rem,4vw,2.9rem)/1.1 var(--serif);margin:0 0 .5rem;letter-spacing:-.01em}
+header p{margin:0;max-width:62ch;color:var(--muted)}
+main{max-width:1280px;margin:auto;padding:0 clamp(1rem,4vw,3rem) 3rem;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:2rem;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+form,.results{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.5rem}
+fieldset{border:0;padding:0;margin:0 0 1.5rem}
+legend{font:600 1.15rem var(--serif);padding:0;margin-bottom:.2rem}
+.hint{color:var(--muted);font-size:.85rem;margin:0 0 .8rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
+label{display:block;font-size:.85rem;color:var(--muted)}
+input,select{width:100%;margin-top:.2rem;padding:.55rem .6rem;border:1px solid var(--line);border-radius:6px;font:inherit;color:var(--ink);background:#fff}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.checks{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem}
+.checks label{display:flex;gap:.45rem;align-items:center;color:var(--ink)}
+.checks input{width:auto;margin:0}
+button.go{width:100%;padding:.85rem;border:0;border-radius:8px;background:var(--ink);color:#fff;font:600 1rem var(--sans);cursor:pointer}
+button.go:hover{background:var(--accent)}
+button.ghost{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline;padding:0;margin-top:.7rem}
+.results{position:sticky;top:1rem;min-height:280px}
+@media(max-width:900px){.results{position:static}}
+.empty{color:var(--muted)}
+.err{background:#FBE9E6;color:#8A2418;padding:.7rem 1rem;border-radius:6px;margin-bottom:1rem}
+.urgent{background:#FBE9E6;border-left:4px solid var(--high);padding:.7rem 1rem;margin-bottom:1rem;border-radius:4px}
+h2{font:600 1.35rem var(--serif);margin:0 0 .3rem}
+.sub{color:var(--muted);font-size:.9rem;margin:0 0 1.2rem}
+.row{padding:.9rem 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.name{font-weight:600}
+.pct{font:600 1.5rem var(--serif)}
+.badge{font-size:.78rem;padding:.1rem .55rem;border-radius:99px;color:#fff;margin-left:.5rem;vertical-align:middle}
+.bar{position:relative;height:10px;background:#E1E9E8;border-radius:5px;margin:.55rem 0 .3rem}
+.fill{height:100%;border-radius:5px;transition:width .6s ease}
+.tick{position:absolute;top:-5px;width:2px;height:20px;background:var(--ink)}
+.legend{font-size:.8rem;color:var(--muted)}
+.drivers{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem}
+.chip{font-size:.8rem;border:1px solid var(--line);border-radius:5px;padding:.1rem .5rem}
+.chip.up{border-color:#E7B3AB;background:#FDF1EF}.chip.down{border-color:#A9D3C3;background:#EFF8F4}
+.recs{margin:.4rem 0 0;padding-left:1.1rem}.recs li{margin-bottom:.5rem}
+.disc{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);margin-top:1.2rem;padding-top:.8rem}
+table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:.6rem}
+th,td{text-align:left;padding:.3rem .4rem;border-bottom:1px solid var(--line)}
+@media(prefers-reduced-motion:reduce){.fill{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>VitalScope</h1>
+  <p>Enter what you know. Machine-learning models estimate your risk for six common conditions, show which factors push it up or down, and suggest what to change first.</p>
+</header>
+<main>
+<form id="f" novalidate>
+  <fieldset><legend>About you</legend><p class="hint">Age and sex are required.</p>
+    <div class="grid" id="g-about"></div></fieldset>
+  <fieldset><legend>Blood pressure</legend><p class="hint">From a home monitor or a recent check-up.</p>
+    <div class="grid" id="g-bp"></div></fieldset>
+  <fieldset><legend>Lab results</legend><p class="hint">Optional. Anything left blank is replaced by a population average, and the result will say so.</p>
+    <div class="grid" id="g-labs"></div></fieldset>
+  <fieldset><legend>Daily habits</legend><div class="grid" id="g-life"></div>
+    <div class="checks" style="margin-top:.8rem"><label><input type="checkbox" name="smoker"> I currently smoke</label></div></fieldset>
+  <fieldset><legend>Family history</legend>
+    <div class="checks">
+      <label><input type="checkbox" name="fh_diabetes"> Diabetes</label>
+      <label><input type="checkbox" name="fh_heart"> Heart disease or stroke</label>
+      <label><input type="checkbox" name="fh_hyper"> Hypertension</label>
+    </div></fieldset>
+  <button class="go" type="submit">Assess my risk</button>
+  <button class="ghost" type="button" id="demo">Fill with an example profile</button>
+</form>
+
+<section class="results" id="out" aria-live="polite">
+  <p class="empty">Your results will appear here.</p>
+</section>
+</main>
+
+<script>
+const FIELDS = {
+ "g-about":[["age","Age (years)","number"],["sex","Sex","select"],["height","Height (cm)","number"],["weight","Weight (kg)","number"],["waist","Waist (cm)","number"]],
+ "g-bp":[["sbp","Systolic (mmHg)","number"],["dbp","Diastolic (mmHg)","number"]],
+ "g-labs":[["glucose","Fasting glucose (mg/dL)","number"],["hba1c","HbA1c (%)","number"],["chol","Total cholesterol","number"],["hdl","HDL","number"],["ldl","LDL","number"],["tg","Triglycerides","number"],["creatinine","Creatinine (mg/dL)","number"]],
+ "g-life":[["alcohol","Alcohol (drinks/week)","number"],["activity","Exercise days/week (0–7)","number"],["sleep","Sleep (hours)","number"],["diet","Diet quality (1–10)","number"],["stress","Stress (1–10)","number"]]
+};
+for (const [id, list] of Object.entries(FIELDS)) {
+  const box = document.getElementById(id);
+  for (const [name, label, type] of list) {
+    const l = document.createElement("label"); l.textContent = label;
+    let el;
+    if (type === "select") {
+      el = document.createElement("select");
+      [["","Select"],["0","Female"],["1","Male"]].forEach(([v,t]) => { const o=document.createElement("option"); o.value=v; o.textContent=t; el.appendChild(o); });
+    } else { el = document.createElement("input"); el.type = "number"; el.step = "any"; }
+    el.name = name; l.appendChild(el); box.appendChild(l);
+  }
+}
+const f = document.getElementById("f"), out = document.getElementById("out");
+const COLORS = {Low:"var(--low)", Moderate:"var(--mod)", High:"var(--high)"};
+const el = (t, c, txt) => { const e = document.createElement(t); if (c) e.className = c; if (txt !== undefined) e.textContent = txt; return e; };
+
+document.getElementById("demo").onclick = () => {
+  const d = {age:52,sex:1,height:172,weight:92,waist:105,sbp:148,dbp:94,glucose:118,activity:1,diet:3,stress:8,alcohol:6,sleep:6};
+  for (const [k,v] of Object.entries(d)) f.elements[k].value = v;
+  f.elements.smoker.checked = true; f.elements.fh_diabetes.checked = true;
+};
+
+f.addEventListener("submit", async e => {
+  e.preventDefault();
+  const data = {};
+  for (const el of f.elements) {
+    if (!el.name) continue;
+    data[el.name] = el.type === "checkbox" ? (el.checked ? 1 : 0) : el.value;
+  }
+  if (data.age === "" || data.sex === "") return show({error:"Please enter your age and sex."});
+  try {
+    const r = await fetch("/api/assess", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
+    show(await r.json());
+  } catch { show({error:"Could not reach the server."}); }
+});
+
+function show(d) {
+  out.replaceChildren();
+  if (d.error) { out.appendChild(el("div","err",d.error)); return; }
+  out.appendChild(el("h2","","Your risk profile"));
+  out.appendChild(el("p","sub", `Ranked by how far each risk sits above the population average. BMI used: ${d.bmi}.`));
+  d.urgent.forEach(t => out.appendChild(el("div","urgent",t)));
+  d.results.forEach(r => {
+    const row = el("div","row"), top = el("div","top");
+    const left = el("div"); left.appendChild(el("span","name",r.disease));
+    const b = el("span","badge",r.level); b.style.background = COLORS[r.level]; left.appendChild(b);
+    top.appendChild(left); top.appendChild(el("span","pct",r.risk + "%")); row.appendChild(top);
+    const bar = el("div","bar"), fill = el("div","fill"); fill.style.background = COLORS[r.level]; fill.style.width = "0";
+    const tick = el("div","tick"); tick.style.left = Math.min(r.baseline,100) + "%"; tick.title = "Population average " + r.baseline + "%";
+    bar.append(fill, tick); row.appendChild(bar);
+    requestAnimationFrame(() => fill.style.width = Math.min(r.risk,100) + "%");
+    row.appendChild(el("div","legend",`Black marker: population average (${r.baseline}%)`));
+    if (r.drivers.length) {
+      const dr = el("div","drivers");
+      r.drivers.forEach(x => dr.appendChild(el("span","chip " + (x.effect>0?"up":"down"),
+        `${x.feature} ${x.effect>0?"+":""}${x.effect} pts`)));
+      row.appendChild(dr);
+    }
+    out.appendChild(row);
+  });
+  if (d.recommendations.length) {
+    out.appendChild(el("h2","","Where to start"));
+    const ul = el("ul","recs");
+    d.recommendations.forEach(r => { const li = el("li"); li.appendChild(el("strong","",r.label + ": ")); li.appendChild(document.createTextNode(r.text)); ul.appendChild(li); });
+    out.appendChild(ul);
+  }
+  if (d.imputed.length) out.appendChild(el("p","hint",`Not provided, so average values were used: ${d.imputed.join(", ")}. Adding them will sharpen the estimate.`));
+  out.appendChild(el("p","disc","This tool is an educational prototype trained on simulated data. It is not a diagnosis. Please consult a qualified doctor for medical decisions."));
+}
+</script>
+</body>
+</html>
